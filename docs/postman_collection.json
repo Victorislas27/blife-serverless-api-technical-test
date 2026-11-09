@@ -1,0 +1,270 @@
+{
+  "info": {
+    "_postman_id": "b-life-serverless-api-collection",
+    "name": "B-Life Store - Serverless REST API",
+    "description": "Colección completa de endpoints para la prueba técnica de B-Life. Incluye CRUD de productos con múltiples variantes y SKU único, registro transaccional de ventas multicanal con bloqueo pesimista e indicadores de negocio (KPIs) con recomendaciones cruzadas.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Health Check",
+      "item": [
+        {
+          "name": "Health Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Verifica que la función AWS Lambda y la conexión con la base de datos PostgreSQL local estén operativas."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Productos y Variantes",
+      "item": [
+        {
+          "name": "Listar Productos (Paginado & Filtros)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?page=1&limit=10&search=Magnesio&category=Minerales",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Número de página" },
+                { "key": "limit", "value": "10", "description": "Registros por página" },
+                { "key": "search", "value": "Magnesio", "description": "Búsqueda por texto en nombre o descripción" },
+                { "key": "category", "value": "Minerales", "description": "Filtrar por categoría exacta" }
+              ]
+            },
+            "description": "Retorna la lista de productos paginada, incluyendo todas las variantes asociadas a cada producto."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Producto por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/11111111-1111-1111-1111-111111111111",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "11111111-1111-1111-1111-111111111111"]
+            },
+            "description": "Retorna el detalle completo de un producto y su lista de variantes."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Variante por Código SKU Único",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/sku/BL-MAG-CIT-180",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "sku", "BL-MAG-CIT-180"]
+            },
+            "description": "Busca una variante específica por su código SKU único y devuelve los datos de la variante junto con su producto padre."
+          },
+          "response": []
+        },
+        {
+          "name": "Crear Producto con N Variantes",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ashwagandha KSM-66 & Rhodiola\",\n  \"description\": \"Suplemento adaptógeno premium para control del estrés, claridad mental y descanso reparador\",\n  \"category\": \"Adaptógenos\",\n  \"brand\": \"B-Life\",\n  \"variants\": [\n    {\n      \"sku\": \"BL-ASH-90CAP\",\n      \"presentation\": \"Frasco con 90 cápsulas\",\n      \"price\": 399.00,\n      \"cost\": 145.00,\n      \"stock\": 80\n    },\n    {\n      \"sku\": \"BL-ASH-180CAP\",\n      \"presentation\": \"Frasco con 180 cápsulas (Doble)\",\n      \"price\": 699.00,\n      \"cost\": 260.00,\n      \"stock\": 45\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"]
+            },
+            "description": "Registra un nuevo producto en el catálogo junto con sus variantes. Valida que cada SKU sea único en la base de datos."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Producto y Variantes",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Citrato de Magnesio Puro 500mg (Fórmula Optimizada)\",\n  \"description\": \"Mineral biodisponible para relajación muscular y soporte óseo\",\n  \"category\": \"Minerales\",\n  \"brand\": \"B-Life\",\n  \"variants\": [\n    {\n      \"sku\": \"BL-MAG-CIT-180\",\n      \"presentation\": \"Frasco con 180 cápsulas\",\n      \"price\": 369.00,\n      \"cost\": 120.00,\n      \"stock\": 110\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/11111111-1111-1111-1111-111111111111",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "11111111-1111-1111-1111-111111111111"]
+            },
+            "description": "Actualiza la información general del producto y sincroniza sus variantes."
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar Producto",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/11111111-1111-1111-1111-111111111111",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "11111111-1111-1111-1111-111111111111"]
+            },
+            "description": "Elimina el producto y sus variantes asociadas."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Ventas Multicanal (Transaccional)",
+      "item": [
+        {
+          "name": "Listar Ventas Registradas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sales?page=1&limit=10&channel=AMAZON_MX",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "channel", "value": "AMAZON_MX", "description": "Filtro opcional por canal de venta" }
+              ]
+            },
+            "description": "Retorna el historial de ventas paginado con sus partidas, cliente y canal de distribución."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Detalle de Venta por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sales/a1111111-aaaa-1111-aaaa-111111111111",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales", "a1111111-aaaa-1111-aaaa-111111111111"]
+            },
+            "description": "Retorna el detalle completo de una orden de venta con su folio (ej. VTA-2026-0001) y todas las partidas vendidas."
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar Venta Multicanal (Transaccional con Bloqueo de Stock)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"BLIFE_SHOPIFY\",\n  \"customerName\": \"Mariana López Sánchez\",\n  \"customerEmail\": \"mariana.lopez@example.com\",\n  \"items\": [\n    {\n      \"sku\": \"BL-MAG-CIT-180\",\n      \"quantity\": 2\n    },\n    {\n      \"sku\": \"BL-COL-HYD-500\",\n      \"quantity\": 1\n    }\n  ],\n  \"notes\": \"Orden procesada vía checkout de Shopify con envío prioritario B-Life Express\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sales",
+              "host": ["{{baseUrl}}"],
+              "path": ["sales"]
+            },
+            "description": "Procesa una venta de forma estrictamente transaccional. Ejecuta SELECT ... FOR UPDATE sobre las variantes involucradas para evitar sobreventa, deduce el stock en tiempo real y asigna folio correlativo."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Indicadores de Negocio y KPIs",
+      "item": [
+        {
+          "name": "KPI: Top Productos Más Vendidos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/indicators/top-products?limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["indicators", "top-products"],
+              "query": [
+                { "key": "limit", "value": "5", "description": "Cantidad de productos top a retornar" }
+              ]
+            },
+            "description": "Retorna el ranking de productos estrella ordenados por volumen de unidades vendidas e ingresos brutos generados."
+          },
+          "response": []
+        },
+        {
+          "name": "KPI: Cuál es mi Utilidad (Ingresos vs Gastos)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/indicators/profitability",
+              "host": ["{{baseUrl}}"],
+              "path": ["indicators", "profitability"]
+            },
+            "description": "Calcula los Ingresos Totales de venta, Costos Totales de mercancía vendida (Gastos), Utilidad Bruta (Ingresos - Costos) y el Margen Porcentual de rentabilidad promedio del negocio."
+          },
+          "response": []
+        },
+        {
+          "name": "KPI: Top Canales de Venta (% Participación)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/indicators/top-channels",
+              "host": ["{{baseUrl}}"],
+              "path": ["indicators", "top-channels"]
+            },
+            "description": "Agrupa las ventas por canal comercial (Amazon, Mercado Libre, Shopify, Tienda Física, Liverpool, WhatsApp), calculando volumen, ingresos y porcentaje de participación de mercado."
+          },
+          "response": []
+        },
+        {
+          "name": "KPI: Productos Recomendados (Cross-Selling)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/indicators/recommendations?productId=11111111-1111-1111-1111-111111111111&limit=4",
+              "host": ["{{baseUrl}}"],
+              "path": ["indicators", "recommendations"],
+              "query": [
+                { "key": "productId", "value": "11111111-1111-1111-1111-111111111111", "description": "ID del producto consultado" },
+                { "key": "limit", "value": "4", "description": "Número de recomendaciones deseadas" }
+              ]
+            },
+            "description": "Algoritmo de Market Basket Analysis que analiza qué productos se compran con mayor frecuencia juntos dentro de la misma orden. Si no hay co-ocurrencia suficiente, aplica fallback a la misma categoría o productos populares."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
+
