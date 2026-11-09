@@ -1,6 +1,6 @@
 import { transaction, closePool, testConnection } from '../config/database';
 import { runMigrations } from './migrate';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'crypto';
 
 /**
  * Semillero oficial de datos para demostración B-Life.

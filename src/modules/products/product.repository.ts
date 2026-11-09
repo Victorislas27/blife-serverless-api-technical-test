@@ -1,6 +1,6 @@
 import { query, transaction } from '../../config/database';
 import { Product, ProductVariant, CreateProductDto, UpdateProductDto, ProductFilterDto } from './product.types';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID as uuidv4 } from 'crypto';
 
 const mapVariantRow = (row: any): ProductVariant => ({
   id: row.id,

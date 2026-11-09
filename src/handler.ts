@@ -1,10 +1,14 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { defaultCorsHeaders, errorResponse } from './common/response';
 import { productsHandler } from './modules/products/product.handler';
+import { salesHandler } from './modules/sales/sale.handler';
 
 /**
- * @param event
- * @returns
+ * Manejador principal Lambda para la API REST de B-Life.
+ * Despacha las solicitudes hacia los controladores de dominio correspondientes.
+ *
+ * @param event Evento de Amazon API Gateway
+ * @returns Respuesta HTTP estándar con código de estado y cuerpo JSON
  */
 export const handler = async (
   event: APIGatewayProxyEvent
@@ -34,6 +38,9 @@ export const handler = async (
 
   if (path.startsWith('/api/products')) {
     return await productsHandler(event);
+  }
+  if (path.startsWith('/api/sales')) {
+    return await salesHandler(event);
   }
 
   return errorResponse(`Recurso no encontrado: ${event.httpMethod} ${path}`, 404);
