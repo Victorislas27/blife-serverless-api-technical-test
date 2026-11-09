@@ -1,0 +1,49 @@
+{
+  "name": "blife-serverless-api",
+  "version": "1.0.0",
+  "description": "API REST Serverless con AWS Lambda, Docker PostgreSQL e Indicadores de Negocio para B-Life",
+  "main": "dist/handler.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "dev": "tsc && serverless offline --stage dev",
+    "start": "serverless offline",
+    "seed": "ts-node src/db/seed.ts",
+    "migrate": "ts-node src/db/migrate.ts",
+    "test": "jest --runInBand",
+    "test:coverage": "jest --runInBand --coverage"
+  },
+  "keywords": [
+    "serverless",
+    "aws-lambda",
+    "api-gateway",
+    "blife",
+    "crud",
+    "postgresql",
+    "kpi",
+    "retail",
+    "indicators"
+  ],
+  "author": "Victor Hugo Islas",
+  "license": "MIT",
+  "packageManager": "pnpm@10.33.1",
+  "dependencies": {
+    "dotenv": "^18.0.10",
+    "pg": "^8.23.1",
+    "uuid": "^14.0.3"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.164",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
+    "@types/uuid": "^11.0.0",
+    "jest": "^30.5.2",
+    "serverless": "^4.46.0",
+    "serverless-offline": "^14.8.4",
+    "serverless-plugin-typescript": "^2.1.5",
+    "ts-jest": "^29.4.15",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: blife_postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: blife_store_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - blife_pgdata:/var/lib/postgresql/data
+      - ./src/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d blife_store_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  blife_pgdata:

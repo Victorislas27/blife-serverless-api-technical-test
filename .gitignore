@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.build/
+.serverless/
+coverage/
+*.log
+.env
+.DS_Store
+local.db
+local.db-journal
+postgres_data/
