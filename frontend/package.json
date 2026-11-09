@@ -1,0 +1,21 @@
+{
+  "name": "blife-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev --port 3001",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview"
+  },
+  "dependencies": {
+    "@quasar/extras": "^1.16.11",
+    "nuxt": "3.13.2",
+    "quasar": "^2.15.2",
+    "vue": "^3.4.38",
+    "vue-router": "^4.4.3"
+  },
+  "devDependencies": {
+    "sass": "^1.77.8"
+  }
+}

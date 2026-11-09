@@ -1,7 +1,7 @@
 {
   "name": "blife-serverless-api",
   "version": "1.0.0",
-  "description": "API REST Serverless con AWS Lambda, Docker PostgreSQL e Indicadores de Negocio para B-Life",
+  "description": "Solución Full-Stack para B-Life: API REST Serverless con AWS Lambda, Docker PostgreSQL y Dashboard en Nuxt 3 + Quasar",
   "main": "dist/handler.js",
   "scripts": {
     "build": "tsc",
@@ -11,7 +11,10 @@
     "seed": "ts-node src/db/seed.ts",
     "migrate": "ts-node src/db/migrate.ts",
     "test": "jest --runInBand",
-    "test:coverage": "jest --runInBand --coverage"
+    "test:coverage": "jest --runInBand --coverage",
+    "dev:frontend": "pnpm --dir frontend dev",
+    "build:frontend": "pnpm --dir frontend build",
+    "build:all": "pnpm build && pnpm --dir frontend build"
   },
   "keywords": [
     "serverless",
@@ -22,25 +25,26 @@
     "postgresql",
     "kpi",
     "retail",
-    "indicators"
+    "indicators",
+    "nuxt",
+    "quasar",
+    "vue"
   ],
   "author": "Victor Hugo Islas",
   "license": "MIT",
   "packageManager": "pnpm@10.33.1",
   "dependencies": {
     "dotenv": "^18.0.10",
-    "pg": "^8.23.1",
-    "uuid": "^14.0.3"
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.164",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.6.6",
     "@types/pg": "^8.23.1",
-    "@types/uuid": "^11.0.0",
     "jest": "^30.5.2",
-    "serverless": "^4.46.0",
-    "serverless-offline": "^14.8.4",
+    "serverless": "^3.38.0",
+    "serverless-offline": "^13.3.3",
     "serverless-plugin-typescript": "^2.1.5",
     "ts-jest": "^29.4.15",
     "ts-node": "^10.9.2",

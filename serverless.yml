@@ -1,6 +1,6 @@
 service: blife-serverless-api
 
-frameworkVersion: '>=3.0.0 <5.0.0'
+frameworkVersion: '3'
 
 provider:
   name: aws
@@ -12,7 +12,7 @@ provider:
   environment:
     NODE_ENV: ${self:provider.stage}
     DB_HOST: ${env:DB_HOST, 'localhost'}
-    DB_PORT: ${env:DB_PORT, '5432'}
+    DB_PORT: ${env:DB_PORT, '5433'}
     DB_USER: ${env:DB_USER, 'postgres'}
     DB_PASSWORD: ${env:DB_PASSWORD, 'postgrespassword'}
     DB_NAME: ${env:DB_NAME, 'blife_store_db'}
