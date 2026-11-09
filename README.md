@@ -39,14 +39,15 @@ El proyecto resuelve de forma integral las necesidades comerciales y analíticas
 | :--- | :--- | :--- | :--- |
 | **Backend Runtime** | Node.js (LTS) | `v20.18.2` | Entorno compatible con el runtime `nodejs20.x` de AWS Lambda. |
 | **Lenguaje** | TypeScript | `^5.4.5` | Tipado estricto en entidades, DTOs y lógica de negocio. |
+| **Arquitectura CPU** | ARM64 (AWS Graviton) | Modern | Mayor rendimiento y ~20% menor costo de ejecución en Lambda. |
 | **Framework Serverless** | Serverless Framework | `v3.38.0` | Orquestación de infraestructura como código y emulación offline local. |
 | **Emulador Local** | serverless-offline | `v13.3.3` | Simulación local de API Gateway y AWS Lambda en el puerto `3000`. |
-| **Base de Datos** | PostgreSQL (Alpine) | `16` | Motor relacional robusto con soporte de transacciones ACID y aislamiento de bloqueos. |
+| **Base de Datos** | PostgreSQL (Alpine) | `16` | Motor relacional robusto con transacciones ACID, secuencias y bloqueos pesimistas. |
 | **Contenerización** | Docker & Compose | Modern | Aislamiento del servicio de PostgreSQL mapeado en puerto host `5433:5432`. |
-| **Frontend Framework** | Nuxt 3 (SPA Mode) | `v3.13.2` | Framework reactivo sobre Vue 3 y Vite para interfaz administrativa. |
-| **Componentes UI** | Quasar Framework | `v2.15.2` | Sistema de diseño Material Design optimizado para dashboards y catálogos. |
-| **Testing** | Jest & ts-jest | `v29.x` / `v30.x` | Suite de pruebas unitarias e integración (18/18 pruebas aprobadas). |
-| **Gestor de Paquetes** | pnpm | `v10.x` | Gestión eficiente y determinista de dependencias mediante monorepo workspace. |
+| **Observabilidad** | Structured JSON Logger | Nativo | Logs estructurados con nivel, timestamp y `awsRequestId` para CloudWatch. |
+| **Testing** | Jest & ts-jest | `v29.x` / `v30.x` | Suite completa con 41 pruebas unitarias aprobadas al 100%. |
+| **CI / CD** | GitHub Actions | Modern | Flujo automatizado de validación, pruebas Jest y build de TypeScript en cada push/PR. |
+| **Gestor de Paquetes** | pnpm | `v10.x` | Gestión determinista y veloz de dependencias. |
 
 ---
 
@@ -100,25 +101,25 @@ flowchart TD
 
 ```text
 /var/www/html/blife/
+├── .github/
+│   └── workflows/ci.yml    # Pipeline CI GitHub Actions (Lint, Jest, TypeScript Build)
 ├── src/
-│   ├── common/             # Clases de error (BadRequest, NotFound, Conflict) y helpers de respuesta CORS
-│   ├── config/             # Configuración del pool de PostgreSQL y ejecutor transaccional seguro
-│   ├── db/                 # DDL relacional (init.sql), migrador (migrate.ts) y seeder de datos (seed.ts)
+│   ├── common/             # Errores (AppError), respuestas CORS, validaciones UUID, parser JSON y Logger
+│   ├── config/             # Configuración del pool de PostgreSQL (max 2) y transacciones ACID
+│   ├── db/                 # DDL relacional (init.sql con secuencias), migrador y seeder de catálogo B-Life
 │   ├── modules/
-│   │   ├── products/       # Tipos, Repositorio, Servicio y Handler de Productos y Variantes
-│   │   ├── sales/          # Tipos, Repositorio, Servicio y Handler de Ventas Transaccionales
+│   │   ├── products/       # Tipos, Repositorio, Servicio y Handler de Productos con Variantes SKU
+│   │   ├── sales/          # Tipos, Repositorio, Servicio y Handler de Ventas Transaccionales e Idempotencia
 │   │   └── indicators/     # Tipos, Repositorio, Servicio y Handler de KPIs y Analítica de Negocio
-│   └── handler.ts          # AWS Lambda Master Router
-├── frontend/               # Aplicación Nuxt 3 + Quasar en modo SPA (:3001)
-│   ├── components/         # ProductsManager.vue, SalesManager.vue, IndicatorsDashboard.vue
-│   ├── composables/        # useBlifeApi.ts (Cliente HTTP reactivo)
-│   ├── plugins/            # quasar.ts (Registro de componentes Material Design)
-│   └── app.vue             # Shell corporativo B-Life con pestañas de navegación
-├── tests/                  # Pruebas unitarias de servicios de productos, ventas e indicadores
+│   └── handler.ts          # AWS Lambda Master Router con despacho exacto y event-loop optimizado
+├── tests/                  # 41 pruebas unitarias (servicios, controladores, idempotencia y reglas de negocio)
 ├── docs/                   # Colección exportada de Postman (postman_collection.json)
-├── docker-compose.yml      # Definición de contenedor PostgreSQL 16
-└── serverless.yml          # Declaración de infraestructura serverless y plugins offline
+├── docker-compose.yml      # Definición del contenedor PostgreSQL 16
+└── serverless.yml          # Declaración de infraestructura serverless (Node.js 20.x, ARM64 Graviton)
 ```
+
+> [!TIP]
+> **Repositorio Frontend:** El panel web interactivo de administración se encuentra en su propio repositorio: [`blife-frontend`](../blife-frontend). Consulte su `README.md` para ejecutar la aplicación en el puerto `3001`.
 
 ---
 
@@ -230,14 +231,24 @@ Para sugerir productos complementarios (*Cross-Selling*), el sistema analiza las
 
 ## Estrategias de Concurrencia y Rendimiento
 
-En escenarios de alto tráfico (como promociones Hot Sale o Prime Day), múltiples clientes pueden intentar comprar el mismo SKU simultáneamente. Para evitar **sobreventa (overselling)** o inconsistencias de inventario (*race conditions*):
+En escenarios de alto tráfico (como promociones Hot Sale o Prime Day), múltiples clientes pueden intentar comprar el mismo SKU simultáneamente. Para garantizar consistencia absoluta y resiliencia en la nube:
 
 1. **Bloqueo Pesimista de Filas (`SELECT ... FOR UPDATE`):**
    Al procesar `POST /api/sales`, el servicio abre una transacción de PostgreSQL y bloquea exclusivamente las filas de las variantes solicitadas. Cualquier otra transacción concurrente que intente acceder al mismo SKU esperará hasta que la transacción actual confirme (`COMMIT`) o descarte (`ROLLBACK`).
-2. **Validación Atómica de Inventario:**
+2. **Prevención Matemática de Deadlocks (Orden Determinista):**
+   Para evitar interbloqueos (*deadlocks*) cuando dos órdenes simultáneas compran los mismos productos en orden inverso, el sistema **ordena alfabéticamente los items por SKU** antes de adquirir los locks `FOR UPDATE`.
+3. **Validación Atómica de Inventario:**
    Si $\text{stock\_disponible} < \text{cantidad\_solicitada}$, la transacción realiza un `ROLLBACK` inmediato y retorna un código HTTP `400 Bad Request` indicando el SKU exacto con existencias insuficientes.
-3. **Generación de Folios Secuenciales:**
-   Los folios se generan mediante bloqueo de lectura sobre la tabla de ventas para evitar colisiones de folios duplicados (`VTA-2026-0001`, `VTA-2026-0002`).
+4. **Secuencia Atómica de Folios (`sale_number_seq`):**
+   Los folios se generan directamente con la secuencia atómica de PostgreSQL `nextval('sale_number_seq')`, eliminando al 100% las condiciones de carrera de folios duplicados (`VTA-YYYY-XXXX`).
+5. **Idempotencia de Órdenes (`Idempotency-Key`):**
+   Soporte para cabecera `Idempotency-Key` en `POST /api/sales`. Si la red del cliente falla y reintenta la misma orden, la API devuelve la venta ya creada sin duplicar cargos ni descontar inventario dos veces.
+6. **Integridad Referencial y Manejo de Conflictos (409):**
+   La base de datos restringe la eliminación de productos que ya cuenten con historial en `sale_items`. La API captura esto como una regla de negocio y responde con un código `409 Conflict` amigable, invitando a archivar o desactivar el producto.
+7. **Ajuste del Pool para Arquitecturas Serverless:**
+   Para prevenir la saturación de conexiones en PostgreSQL ante ráfagas concurrentes de Lambdas, el pool se autolimita a `max: 2` conexiones por contenedor y se desactiva la espera del bucle de eventos (`context.callbackWaitsForEmptyEventLoop = false`).
+8. **Arquitectura ARM64 (AWS Graviton):**
+   Configurado en `serverless.yml` para ofrecer hasta 20% mejor rendimiento y menor latencia en *cold starts*.
 
 ---
 
@@ -290,9 +301,11 @@ pnpm dev
 La API estará disponible en `http://localhost:3000/api`.
 
 ### Paso 7: Iniciar el Dashboard Frontend (Puerto 3001)
-En una segunda terminal:
+El frontend se ejecuta desde su propio repositorio independiente:
 ```bash
-pnpm dev:frontend
+cd /var/www/html/blife-frontend
+pnpm install
+pnpm dev
 ```
 Abre tu navegador en: **`http://localhost:3001`**
 
@@ -465,16 +478,44 @@ pnpm test
 
 ### Resultados de la Suite de Pruebas:
 ```text
-PASS tests/indicators.test.ts
-  IndicatorService Unit Tests
-    getTopProducts
-      ✓ debe retornar los productos más vendidos ordenados por unidades e ingresos
-    getProfitability (Cuál es mi utilidad)
-      ✓ debe calcular correctamente los ingresos, gastos, utilidad bruta y margen porcentual
-    getTopChannels
-      ✓ debe retornar el ranking de canales de venta con su porcentaje de participación
-    getRecommendations
-      ✓ debe retornar productos comprados frecuentemente juntos cuando hay historial cruzado
+PASS tests/handlers.test.ts
+  AWS Lambda Handlers Unit Tests
+    Main handler (src/handler.ts)
+      ✓ debe responder 200 en peticiones preflight OPTIONS
+      ✓ debe responder 200 en el health check (/api/health)
+      ✓ debe responder 404 para rutas no reconocidas
+      ✓ no debe permitir falsos positivos de prefijos como /api/productsfoo
+      ✓ debe despachar correctamente a /api/products/{id} con UUID válido
+      ✓ debe despachar correctamente a /api/sales/{id} con UUID válido
+    indicatorsHandler (src/modules/indicators/indicator.handler.ts)
+      ✓ debe rechazar métodos distintos a GET con código 405
+      ✓ debe retornar 404 si la sub-ruta de indicador no existe
+      ✓ debe retornar 404 en subrutas anidadas no reconocidas como /api/indicators/x/top-products
+      ✓ debe responder 200 y datos al consultar /top-products
+      ✓ debe responder 200 y datos al consultar /profitability
+      ✓ debe responder 200 y datos al consultar /top-channels
+      ✓ debe responder 200 y datos al consultar /recommendations
+    productsHandler (src/modules/products/product.handler.ts)
+      ✓ debe responder 400 si se envía un ID que no es un UUID válido
+      ✓ debe responder 400 si el cuerpo en POST está vacío
+      ✓ debe responder 400 si el JSON en POST está malformado
+      ✓ debe crear un producto con código 201 en POST válido
+      ✓ debe consultar producto por SKU en /api/products/sku/{sku}
+    salesHandler (src/modules/sales/sale.handler.ts)
+      ✓ debe responder 400 si se envía un ID de venta que no es un UUID válido
+      ✓ debe responder 400 si el JSON en POST está malformado
+      ✓ debe registrar venta con código 201 en POST válido
+
+PASS tests/sales.test.ts
+  SaleService Unit Tests
+    createSale
+      ✓ debe rechazar una venta sin canal especificado
+      ✓ debe rechazar una venta sin nombre de cliente
+      ✓ debe rechazar una venta sin partidas o items
+      ✓ debe rechazar items con cantidades negativas o cero
+      ✓ debe registrar una venta exitosa calculando totales correctamente
+    getSaleById
+      ✓ debe arrojar NotFoundError si la venta no existe
 
 PASS tests/products.test.ts
   ProductService Unit Tests
@@ -488,22 +529,36 @@ PASS tests/products.test.ts
     getProductBySku
       ✓ debe retornar la variante y su producto padre cuando el SKU existe
       ✓ debe arrojar NotFoundError cuando el SKU no existe
+    deleteProduct
+      ✓ debe rechazar la eliminación con ConflictError si el producto tiene ventas asociadas
+      ✓ debe eliminar exitosamente el producto si no tiene ventas asociadas
 
-PASS tests/sales.test.ts
-  SaleService Unit Tests
-    createSale
-      ✓ debe rechazar una venta sin canal especificado
-      ✓ debe rechazar una venta sin nombre de cliente
-      ✓ debe rechazar una venta sin partidas o items
-      ✓ debe rechazar items con cantidades negativas o cero
-      ✓ debe registrar una venta exitosa calculando totales correctamente
-    getSaleById
-      ✓ debe arrojar NotFoundError si la venta no existe
+PASS tests/indicators.test.ts
+  IndicatorService Unit Tests
+    getTopProducts
+      ✓ debe retornar los productos más vendidos ordenados por unidades e ingresos
+    getProfitability (Cuál es mi utilidad)
+      ✓ debe calcular correctamente los ingresos, gastos, utilidad bruta y margen porcentual
+    getTopChannels
+      ✓ debe retornar el ranking de canales de venta con su porcentaje de participación
+    getRecommendations
+      ✓ debe retornar productos comprados frecuentemente juntos cuando hay historial cruzado
 
-Test Suites: 3 passed, 3 total
-Tests:       18 passed, 18 total
-Time:        ~1.2s
+Test Suites: 4 passed, 4 total
+Tests:       41 passed, 41 total
+Snapshots:   0 total
+Time:        ~1.3s
 ```
+
+---
+
+## Integración Continua (CI / CD Pipeline)
+
+El proyecto cuenta con un flujo automatizado de integración continua mediante **GitHub Actions** (`.github/workflows/ci.yml`):
+* Se dispara en cada `push` o `pull_request` a las ramas `main` y `dev`.
+* Configura Node.js `20.x` y `pnpm`.
+* Ejecuta la suite de pruebas automatizadas (`pnpm test`).
+* Valida la compilación limpia del código en TypeScript (`pnpm build`).
 
 ---
 
