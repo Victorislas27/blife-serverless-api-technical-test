@@ -11,10 +11,7 @@
     "seed": "ts-node src/db/seed.ts",
     "migrate": "ts-node src/db/migrate.ts",
     "test": "jest --runInBand",
-    "test:coverage": "jest --runInBand --coverage",
-    "dev:frontend": "pnpm --dir frontend dev",
-    "build:frontend": "pnpm --dir frontend build",
-    "build:all": "pnpm build && pnpm --dir frontend build"
+    "test:coverage": "jest --runInBand --coverage"
   },
   "keywords": [
     "serverless",

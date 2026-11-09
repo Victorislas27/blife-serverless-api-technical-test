@@ -26,7 +26,10 @@ El proyecto resuelve de forma integral las necesidades comerciales y analíticas
 * **Gestión de Catálogo Multivariante:** Soporte para productos con $N$ variantes (presentaciones, tamaños, dosis), cada una identificada por un código **SKU único e irrepetible**, precio de venta, costo de adquisición e inventario independiente.
 * **Procesamiento Transaccional de Ventas Multicanal:** Registro de órdenes provenientes de múltiples canales de distribución (`AMAZON_MX`, `MERCADOLIBRE`, `BLIFE_SHOPIFY`, `TIENDA_FISICA`, `LIVERPOOL`, `WHATSAPP`) con deducción atómica de stock en tiempo real y asignación de folios consecutivos (`VTA-YYYY-XXXX`).
 * **Inteligencia de Negocio y KPIs:** Endpoints dedicados para el cálculo de productos estrella (Top Ventas), utilidad neta y margen porcentual (*¿Cuánto gana vs. cuánto gasta la empresa?*), desglose de cuota de mercado por canal y motor de recomendaciones cruzadas (*Cross-Selling*) basado en afinidad de canasta.
-* **Dashboard Web Interactivo:** Aplicación SPA desarrollada con Nuxt 3 y Quasar Framework con tema corporativo B-Life (`#103B2B`), proporcionando catálogo dinámico, terminal de punto de venta y analítica gráfica en tiempo real.
+* **Dashboard Web Desacoplado:** Interfaz gráfica desarrollada con Nuxt 3 y Quasar Framework alojada en su propio repositorio independiente (`blife-frontend`).
+
+> [!NOTE]
+> **Repositorio Frontend:** El panel de administración web ha sido desacoplado a su propio repositorio independiente: [`blife-frontend`](../blife-frontend). Consulte su respectivo `README.md` para su instalación y ejecución.
 
 ---
 
