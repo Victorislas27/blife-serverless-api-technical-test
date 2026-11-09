@@ -33,3 +33,4 @@ jobs:
 
       - name: Compilar TypeScript (tsc)
         run: pnpm build
+
