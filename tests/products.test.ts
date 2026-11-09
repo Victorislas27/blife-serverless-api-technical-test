@@ -16,6 +16,7 @@ describe('ProductService Unit Tests', () => {
       findAll: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      hasSales: jest.fn(),
     } as any;
 
     productService = new ProductService(mockRepository);
@@ -168,6 +169,35 @@ describe('ProductService Unit Tests', () => {
       mockRepository.findBySku.mockResolvedValue(null);
 
       await expect(productService.getProductBySku('SKU-INEXISTENTE')).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  describe('deleteProduct', () => {
+    const mockProduct = {
+      id: 'prod-1',
+      name: 'Colágeno',
+      description: '',
+      category: 'Belleza',
+      brand: 'B-Life',
+      status: 'ACTIVE' as const,
+    };
+
+    it('debe rechazar la eliminación con ConflictError si el producto tiene ventas asociadas', async () => {
+      mockRepository.findById.mockResolvedValue(mockProduct);
+      mockRepository.hasSales.mockResolvedValue(true);
+
+      await expect(productService.deleteProduct('prod-1')).rejects.toThrow(ConflictError);
+      expect(mockRepository.delete).not.toHaveBeenCalled();
+    });
+
+    it('debe eliminar exitosamente el producto si no tiene ventas asociadas', async () => {
+      mockRepository.findById.mockResolvedValue(mockProduct);
+      mockRepository.hasSales.mockResolvedValue(false);
+      mockRepository.delete.mockResolvedValue(true);
+
+      const res = await productService.deleteProduct('prod-1');
+      expect(res.deletedId).toBe('prod-1');
+      expect(mockRepository.delete).toHaveBeenCalledWith('prod-1');
     });
   });
 });
