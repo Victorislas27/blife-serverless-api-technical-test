@@ -294,6 +294,14 @@ export class ProductRepository {
     });
   }
 
+  async hasSales(productId: string): Promise<boolean> {
+    const res = await query(
+      'SELECT 1 FROM sale_items WHERE product_id = $1 LIMIT 1',
+      [productId]
+    );
+    return res.rows.length > 0;
+  }
+
   async delete(id: string): Promise<boolean> {
     const res = await query('DELETE FROM products WHERE id = $1 RETURNING id', [id]);
     return res.rows.length > 0;

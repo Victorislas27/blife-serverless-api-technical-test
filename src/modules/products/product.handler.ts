@@ -1,16 +1,26 @@
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from 'aws-lambda';
 import { ProductService } from './product.service';
 import { successResponse, errorResponse } from '../../common/response';
+import { parseBody } from '../../common/request';
+import { validateUuid } from '../../common/validation';
 import { AppError } from '../../common/errors';
 
 const productService = new ProductService();
 
 /**
  * Despachador Lambda para las operaciones CRUD y búsquedas del módulo de Productos.
+ *
+ * @param event Evento de Amazon API Gateway
+ * @param context Contexto de ejecución de AWS Lambda (opcional)
  */
 export const productsHandler = async (
-  event: APIGatewayProxyEvent
+  event: APIGatewayProxyEvent,
+  context?: Context
 ): Promise<APIGatewayProxyResult> => {
+  if (context) {
+    context.callbackWaitsForEmptyEventLoop = false;
+  }
+
   const method = event.httpMethod;
   const path = event.path;
   const pathParts = path.split('/').filter(Boolean);
@@ -25,7 +35,7 @@ export const productsHandler = async (
 
     // 2. GET /api/products/{id}
     if (method === 'GET' && pathParts.length === 3 && pathParts[2] !== 'sku') {
-      const id = pathParts[2];
+      const id = validateUuid(pathParts[2], 'id');
       const product = await productService.getProductById(id);
       return successResponse(product);
     }
@@ -40,8 +50,8 @@ export const productsHandler = async (
         status: q.status,
         minPrice: q.minPrice ? parseFloat(q.minPrice) : undefined,
         maxPrice: q.maxPrice ? parseFloat(q.maxPrice) : undefined,
-        page: q.page ? parseInt(q.page, 10) : 1,
-        limit: q.limit ? parseInt(q.limit, 10) : 10,
+        page: q.page ? Math.max(1, parseInt(q.page, 10) || 1) : 1,
+        limit: q.limit ? Math.max(1, parseInt(q.limit, 10) || 10) : 10,
       };
       const result = await productService.listProducts(filters);
       return successResponse(result);
@@ -49,28 +59,22 @@ export const productsHandler = async (
 
     // 4. POST /api/products (Crear producto con variantes)
     if (method === 'POST') {
-      if (!event.body) {
-        return errorResponse('El cuerpo de la solicitud no puede estar vacío.', 400);
-      }
-      const body = JSON.parse(event.body);
+      const body = parseBody(event.body);
       const created = await productService.createProduct(body);
       return successResponse(created, 201);
     }
 
     // 5. PUT /api/products/{id} (Actualizar producto y/o variantes)
     if (method === 'PUT' && pathParts.length === 3) {
-      const id = pathParts[2];
-      if (!event.body) {
-        return errorResponse('El cuerpo de la solicitud no puede estar vacío.', 400);
-      }
-      const body = JSON.parse(event.body);
+      const id = validateUuid(pathParts[2], 'id');
+      const body = parseBody(event.body);
       const updated = await productService.updateProduct(id, body);
       return successResponse(updated);
     }
 
     // 6. DELETE /api/products/{id}
     if (method === 'DELETE' && pathParts.length === 3) {
-      const id = pathParts[2];
+      const id = validateUuid(pathParts[2], 'id');
       const res = await productService.deleteProduct(id);
       return successResponse(res);
     }
@@ -80,7 +84,22 @@ export const productsHandler = async (
     if (error instanceof AppError) {
       return errorResponse(error.message, error.statusCode, error.details);
     }
+    // Captura específica para errores de sintaxis en tipos de datos de PostgreSQL (ej. UUID)
+    if (error.code === '22P02') {
+      return errorResponse('Identificador provisto con formato inválido.', 400);
+    }
+    // Captura de violación de llave foránea (ej. eliminar producto o variante con ventas asociadas)
+    if (error.code === '23503') {
+      return errorResponse(
+        'No es posible eliminar o modificar el recurso porque tiene registros relacionados en el historial (ej. ventas asociadas). Puedes desactivarlo cambiando su estado.',
+        409
+      );
+    }
     console.error(`[ProductsHandler Error] ${method} ${path}:`, error);
-    return errorResponse('Error interno al procesar la solicitud de productos.', 500, error.message);
+    return errorResponse(
+      'Error interno al procesar la solicitud de productos.',
+      500,
+      process.env.NODE_ENV === 'production' ? null : error.message
+    );
   }
 };

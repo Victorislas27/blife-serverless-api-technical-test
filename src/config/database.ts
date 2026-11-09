@@ -12,7 +12,7 @@ const dbConfig = {
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD || 'postgrespassword',
   database: process.env.DB_NAME || 'blife_store_db',
-  max: 20, // Máximo de clientes en el pool para alto rendimiento
+  max: parseInt(process.env.DB_MAX_CONNECTIONS || '2', 10), // Optimizado a 2 para entornos serverless (evita agotar conexiones de Postgres con múltiples Lambdas concurrentes)
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,

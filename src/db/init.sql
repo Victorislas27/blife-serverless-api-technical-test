@@ -41,9 +41,11 @@ CREATE TABLE IF NOT EXISTS product_variants (
 );
 
 -- ------------------------------------------------------------------------------
--- 3. Tabla: sales
+-- 3. Secuencia y Tabla: sales
 -- Registra las órdenes de venta realizadas por canal de distribución.
 -- ------------------------------------------------------------------------------
+CREATE SEQUENCE IF NOT EXISTS sale_number_seq START WITH 1 INCREMENT BY 1;
+
 CREATE TABLE IF NOT EXISTS sales (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sale_number VARCHAR(100) UNIQUE NOT NULL,
@@ -53,8 +55,11 @@ CREATE TABLE IF NOT EXISTS sales (
     total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00 CHECK (total_amount >= 0),
     total_cost NUMERIC(12, 2) NOT NULL DEFAULT 0.00 CHECK (total_cost >= 0),
     sale_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    idempotency_key VARCHAR(255) UNIQUE
 );
+
+CREATE INDEX IF NOT EXISTS idx_sales_idempotency_key ON sales(idempotency_key);
 
 -- ------------------------------------------------------------------------------
 -- 4. Tabla: sale_items

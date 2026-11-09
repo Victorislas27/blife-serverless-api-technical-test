@@ -45,6 +45,7 @@ export interface CreateSaleDto {
   customerName: string;
   items: CreateSaleItemDto[];
   saleDate?: string;
+  idempotencyKey?: string;
 }
 
 export interface SaleFilterDto {

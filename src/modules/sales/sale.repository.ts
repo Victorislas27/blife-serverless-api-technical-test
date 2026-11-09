@@ -1,4 +1,5 @@
 import { query, transaction } from '../../config/database';
+import { PoolClient } from 'pg';
 import { Sale, SaleItem, CreateSaleDto, SaleFilterDto } from './sale.types';
 import { BadRequestError, NotFoundError } from '../../common/errors';
 import { randomUUID as uuidv4 } from 'crypto';
@@ -32,27 +33,69 @@ const mapSaleItemRow = (row: any): SaleItem => ({
 });
 
 export class SaleRepository {
-  private async generateSaleNumber(): Promise<string> {
+  private async generateSaleNumber(client?: PoolClient): Promise<string> {
     const year = new Date().getFullYear();
-    const countRes = await query(
-      `SELECT COUNT(*) as count FROM sales WHERE sale_number LIKE $1`,
-      [`VTA-${year}-%`]
+    const runQuery = client
+      ? (text: string, params?: any[]) => client.query(text, params)
+      : query;
+
+    try {
+      const seqRes = await runQuery(`SELECT nextval('sale_number_seq') AS next_val`);
+      const val = seqRes.rows[0]?.next_val || 1;
+      return `VTA-${year}-${val.toString().padStart(4, '0')}`;
+    } catch {
+      // Fallback si la secuencia aún no existe en el esquema
+      const countRes = await runQuery(
+        `SELECT COUNT(*) as count FROM sales WHERE sale_number LIKE $1`,
+        [`VTA-${year}-%`]
+      );
+      const count = parseInt(countRes.rows[0]?.count || '0', 10) + 1;
+      return `VTA-${year}-${count.toString().padStart(4, '0')}`;
+    }
+  }
+
+  private async getItemsBySaleId(saleId: string): Promise<SaleItem[]> {
+    const itemsRes = await query(
+      `SELECT si.*, p.name AS product_name, v.variant_name
+       FROM sale_items si
+       INNER JOIN products p ON si.product_id = p.id
+       INNER JOIN product_variants v ON si.variant_id = v.id
+       WHERE si.sale_id = $1
+       ORDER BY si.subtotal_amount DESC`,
+      [saleId]
     );
-    const count = parseInt(countRes.rows[0]?.count || '0', 10) + 1;
-    return `VTA-${year}-${count.toString().padStart(4, '0')}`;
+    return itemsRes.rows.map(mapSaleItemRow);
   }
 
   async create(data: CreateSaleDto): Promise<Sale> {
+    // 1. Idempotencia: si ya existe una venta procesada con esta clave, se devuelve sin duplicar
+    if (data.idempotencyKey && data.idempotencyKey.trim()) {
+      const existingRes = await query(
+        `SELECT * FROM sales WHERE idempotency_key = $1`,
+        [data.idempotencyKey.trim()]
+      );
+      if (existingRes.rows.length > 0) {
+        const existingSale = existingRes.rows[0];
+        const items = await this.getItemsBySaleId(existingSale.id);
+        return mapSaleRow(existingSale, items);
+      }
+    }
+
     return await transaction(async (client) => {
       const saleId = uuidv4();
-      const saleNumber = await this.generateSaleNumber();
+      const saleNumber = await this.generateSaleNumber(client);
       const saleDate = data.saleDate ? new Date(data.saleDate) : new Date();
 
       let totalAmount = 0;
       let totalCost = 0;
       const saleItemsToInsert: any[] = [];
 
-      for (const item of data.items) {
+      // Ordenar items determinísticamente por SKU para evitar Deadlocks en compras con items cruzados
+      const sortedItems = [...data.items].sort((a, b) =>
+        a.sku.trim().toUpperCase().localeCompare(b.sku.trim().toUpperCase())
+      );
+
+      for (const item of sortedItems) {
         const normalizedSku = item.sku.trim().toUpperCase();
         const variantRes = await client.query(
           `SELECT v.*, p.name AS product_name 
@@ -109,8 +152,8 @@ export class SaleRepository {
       }
 
       const saleRes = await client.query(
-        `INSERT INTO sales (id, sale_number, channel, customer_name, status, total_amount, total_cost, sale_date)
-         VALUES ($1, $2, $3, $4, 'COMPLETED', $5, $6, $7)
+        `INSERT INTO sales (id, sale_number, channel, customer_name, status, total_amount, total_cost, sale_date, idempotency_key)
+         VALUES ($1, $2, $3, $4, 'COMPLETED', $5, $6, $7, $8)
          RETURNING *`,
         [
           saleId,
@@ -120,6 +163,7 @@ export class SaleRepository {
           totalAmount,
           totalCost,
           saleDate,
+          data.idempotencyKey ? data.idempotencyKey.trim() : null,
         ]
       );
 
@@ -158,18 +202,7 @@ export class SaleRepository {
     if (saleRes.rows.length === 0) {
       return null;
     }
-
-    const itemsRes = await query(
-      `SELECT si.*, p.name AS product_name, v.variant_name
-       FROM sale_items si
-       INNER JOIN products p ON si.product_id = p.id
-       INNER JOIN product_variants v ON si.variant_id = v.id
-       WHERE si.sale_id = $1
-       ORDER BY si.subtotal_amount DESC`,
-      [id]
-    );
-
-    const items = itemsRes.rows.map(mapSaleItemRow);
+    const items = await this.getItemsBySaleId(id);
     return mapSaleRow(saleRes.rows[0], items);
   }
 

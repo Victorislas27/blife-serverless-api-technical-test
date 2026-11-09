@@ -97,6 +97,14 @@ export class ProductService {
   }
   async deleteProduct(id: string): Promise<{ message: string; deletedId: string }> {
     await this.getProductById(id);
+
+    const hasSales = await this.productRepository.hasSales(id);
+    if (hasSales) {
+      throw new ConflictError(
+        `No es posible eliminar el producto con ID "${id}" porque tiene ventas asociadas en el historial. Para retirarlo de la venta, puedes cambiar su estado a 'INACTIVE' o 'ARCHIVED'.`
+      );
+    }
+
     const deleted = await this.productRepository.delete(id);
     if (!deleted) {
       throw new NotFoundError(`No se pudo eliminar el producto con ID "${id}".`);
